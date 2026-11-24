@@ -1,0 +1,35 @@
+name: Release
+
+# Cut a release with e.g. `gh release create v0.0.2 --generate-notes`.
+# The tag is the single source of truth for the version: it is stamped into
+# manifest.json inside the packaged zip (the committed manifest is a placeholder).
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  package:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # upload the zip to the release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - name: Stamp version from tag
+        run: python3 scripts/stamp_version.py "${{ github.event.release.tag_name }}"
+      - name: Build zip
+        run: |
+          cd custom_components/omnifocus
+          zip -r "$GITHUB_WORKSPACE/omnifocus.zip" . -x '*__pycache__*' '*.pyc'
+      - name: Attach to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" omnifocus.zip --clobber
