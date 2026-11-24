@@ -80,6 +80,18 @@ pytest
 
 `custom_components/omnifocus/api/` is a pure-Python client with no Home Assistant imports.
 
+## Releasing
+
+The release tag is the single source of truth for the version; `manifest.json` in the repo
+carries a `0.0.0` placeholder. To cut a release (after CI is green on `main`):
+
+```bash
+gh release create v0.0.3 --target main --generate-notes
+```
+
+The *Release* workflow runs the tests, stamps the tag's version into `manifest.json`, builds
+`omnifocus.zip` and attaches it to the release. HACS installs from that zip.
+
 ## Credits
 
 [OmniGroup/OmniGroup](https://github.com/omnigroup/OmniGroup) (encryption format),
