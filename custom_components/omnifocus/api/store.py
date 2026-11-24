@@ -60,6 +60,34 @@ def utc_stamp(when: datetime | None = None) -> str:
     return (when or datetime.now(UTC)).astimezone(UTC).strftime("%Y%m%d%H%M%S")
 
 
+def order_transactions(transactions: list[TransactionFile]) -> list[TransactionFile]:
+    """Order by timestamp, and by parent chain within the same second.
+
+    File names only carry one-second resolution, so two transactions written in
+    the same second would otherwise sort by their random ids and could replay
+    out of order.
+    """
+    ordered: list[TransactionFile] = []
+    by_stamp: dict[str, list[TransactionFile]] = {}
+    for txn in sorted(transactions, key=lambda t: t.name):
+        by_stamp.setdefault(txn.timestamp, []).append(txn)
+    for stamp in sorted(by_stamp):
+        group = by_stamp[stamp]
+        tails = {t.tail for t in group}
+        done: set[str] = set()
+        pending = list(group)
+        while pending:
+            # Emit one whose in-group parents are all already emitted.
+            ready = next(
+                (t for t in pending if all(p in done or p not in tails for p in t.parents)),
+                pending[0],  # cycle/garbage: fall back to name order
+            )
+            pending.remove(ready)
+            done.add(ready.tail)
+            ordered.append(ready)
+    return ordered
+
+
 def compute_head_tail(transactions: list[TransactionFile]) -> str | None:
     """The tail id that no other transaction lists as a parent (newest wins)."""
     if not transactions:
@@ -108,7 +136,7 @@ class OmniFocusStore:
                 listing.client_files.append(entry.name)
             elif (txn := parse_txn_name(entry.name)) is not None:
                 listing.transactions.append(txn)
-        listing.transactions.sort(key=lambda t: t.name)
+        listing.transactions = order_transactions(listing.transactions)
         return listing
 
     def _decode(self, name: str, data: bytes) -> bytes:

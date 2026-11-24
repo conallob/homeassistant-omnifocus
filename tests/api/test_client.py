@@ -153,11 +153,13 @@ async def test_add_task_inbox_and_project(server, session) -> None:
     tid = await client.async_add_task(INBOX, "New thing", note="line1\nline2 <&>", due=due)
     pid = await client.async_add_task(Target("project", "proj1"), "Hang door")
 
-    new = sorted(set(fake.txn_names()) - before)
-    assert len(new) == 2
-    # Chained: the second transaction descends from the first one's tail.
+    added = set(fake.txn_names()) - before
+    assert len(added) == 2
+    # Chained: one descends from the baseline head, the next from that one's tail.
+    # (Same-second names sort by random id, so order by parent, not by name.)
+    new = sorted(added, key=lambda n: not n.split("=")[1].startswith("aaaaaaaaaaa+"))
     first_tail = new[0].split("=")[1].removesuffix(".zip").split("+")[-1]
-    assert first_tail in new[1]
+    assert new[1].split("=")[1].startswith(first_tail + "+")
     assert "<inbox>true</inbox>" in fake.read_transaction(new[0])
     assert "<due>2026-08-01T09:30:00.000</due>" in fake.read_transaction(new[0])
 
@@ -266,3 +268,16 @@ async def test_unencrypted_store(session) -> None:
         assert snap.results[INBOX].items
     finally:
         await srv.close()
+
+
+async def test_same_second_transactions_replay_in_chain_order(server, session) -> None:
+    """An add then an update written in the same second must replay add-first."""
+    _, srv = server
+    client = make_client(srv, session)
+    await client.async_refresh([INBOX], TZ)
+    tid = await client.async_add_task(INBOX, "Quick")
+    await client.async_update_task(tid, name="Quick (renamed)")
+    # A fresh client replays purely from the files on the server.
+    fresh = make_client(srv, session)
+    snap = await fresh.async_refresh([INBOX], TZ)
+    assert "Quick (renamed)" in [i.name for i in snap.results[INBOX].items]
