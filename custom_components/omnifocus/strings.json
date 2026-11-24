@@ -1,0 +1,104 @@
+{
+  "application_credentials": {
+    "description": "Add your Omni Sync Server account. Enter your **sync username** as the *Client ID* and your **sync password** as the *Client secret*. These are not OAuth credentials; Home Assistant is only used as a secure vault. See [the documentation]({more_info_url})."
+  },
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to OmniFocus",
+        "description": "Pick the stored Omni Sync Server credentials. Leave the passphrase empty if your database is encrypted with your sync password (the OmniFocus default).",
+        "data": {
+          "implementation": "Credentials",
+          "passphrase": "Encryption passphrase (optional)",
+          "server_url": "Sync server URL",
+          "database": "Database name"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate with OmniFocus",
+        "description": "The sync server or database rejected the stored credentials or passphrase. Update the credential in *Application credentials* if the password changed, then confirm here.",
+        "data": {
+          "implementation": "Credentials",
+          "passphrase": "Encryption passphrase (optional)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot reach the Omni Sync Server.",
+      "invalid_auth": "The sync username or password was rejected.",
+      "invalid_passphrase": "The encryption passphrase is incorrect.",
+      "unknown": "Unexpected error; see the Home Assistant log."
+    },
+    "abort": {
+      "already_configured": "This OmniFocus account is already configured.",
+      "missing_credentials": "Add your Omni Sync Server account under Settings > Application credentials first.",
+      "reauth_successful": "Re-authentication was successful."
+    }
+  },
+  "config_subentries": {
+    "todo_list": {
+      "initiate_flow": {
+        "user": "Add to-do list",
+        "reconfigure": "Reconfigure to-do list"
+      },
+      "entry_type": "To-do list",
+      "step": {
+        "user": {
+          "title": "Map a to-do list",
+          "description": "Each Home Assistant to-do list maps to exactly one OmniFocus inbox, project or perspective. Lists default to read-only.",
+          "data": {
+            "name": "List name",
+            "target_type": "OmniFocus source",
+            "mode": "Mode"
+          }
+        },
+        "project": {
+          "title": "Choose project",
+          "data": { "project": "Project" }
+        },
+        "perspective": {
+          "title": "Choose perspective",
+          "description": "Perspective support is best-effort: custom perspective rules are evaluated by Home Assistant, and items cannot be added to a perspective.",
+          "data": { "perspective": "Perspective" }
+        }
+      },
+      "error": {
+        "already_mapped": "That OmniFocus source is already mapped to another to-do list."
+      },
+      "abort": {
+        "entry_not_loaded": "The OmniFocus account must be loaded before adding lists.",
+        "no_projects": "No active projects were found in OmniFocus.",
+        "no_perspectives": "No custom perspectives were found in OmniFocus.",
+        "reconfigure_successful": "To-do list updated."
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": { "scan_interval": "Polling interval" },
+        "data_description": { "scan_interval": "How often to check the sync server for changes, in seconds." }
+      }
+    }
+  },
+  "selector": {
+    "target_type": {
+      "options": {
+        "inbox": "Inbox",
+        "project": "Project",
+        "perspective": "Perspective (custom)"
+      }
+    },
+    "mode": {
+      "options": {
+        "read_only": "Read only",
+        "read_write": "Read / write"
+      }
+    }
+  },
+  "exceptions": {
+    "read_only": { "message": "This to-do list is read-only. Change its mode to read / write to edit it." },
+    "not_found": { "message": "That item no longer exists in OmniFocus." },
+    "write_failed": { "message": "OmniFocus rejected the change: {error}" }
+  }
+}
