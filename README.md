@@ -99,4 +99,12 @@ The *Release* workflow runs the tests, stamps the tag's version into `manifest.j
 [tomzx/ofocus-format](https://github.com/tomzx/ofocus-format),
 [rubyfocus](https://github.com/jyruzicka/rubyfocus).
 
-MIT licensed.
+## Trademarks
+
+OmniFocus and the OmniFocus icon are trademarks of the Omni Group. The icon in
+`custom_components/omnifocus/brand/` is the Omni Group's, used under their
+[press guidelines](https://www.omnigroup.com/press/) to refer to their software; it is **not**
+covered by this project's MIT license, and this project is not affiliated with or endorsed by
+the Omni Group.
+
+The code is MIT licensed.
