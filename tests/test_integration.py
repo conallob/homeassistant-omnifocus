@@ -210,9 +210,14 @@ async def test_read_write_list_round_trip(hass: HomeAssistant, fake) -> None:
     assert "Water plants" not in {i["summary"] for i in result["todo.inbox"]["items"]}
 
     # What we wrote is valid, encrypted, and readable by an independent decrypt.
+    # File names have one-second resolution, so same-second writes are not in name
+    # order; check the set, and that the three form a single parent chain.
     new = [n for n in server.txn_names() if n != BASELINE]
     assert len(new) == 3
-    assert "Water plants" in server.read_transaction(new[0])
+    assert any("Water plants" in server.read_transaction(n) for n in new)
+    tails = {n.split("=")[1].removesuffix(".zip").split("+")[-1] for n in new}
+    parents = {n.split("=")[1].removesuffix(".zip").split("+")[0] for n in new}
+    assert len(parents - tails) == 1  # exactly one transaction descends from the baseline
 
 
 async def test_deleted_project_makes_list_unavailable(hass: HomeAssistant, fake) -> None:
