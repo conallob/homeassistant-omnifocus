@@ -197,6 +197,11 @@ class OmniFocusClient:
             await self._ensure_unlocked()
             await self._store.list()
 
+    async def async_encryption_info(self) -> dict[str, object] | None:
+        """Non-secret encryption settings (never keys or salts), for diagnostics."""
+        async with self._lock:
+            return await self._store.encryption_info()
+
     async def _fetch_new(self) -> list[tuple[str, bytes]]:
         """List the store and download transactions we have not applied yet."""
         listing = await self._store.list()

@@ -77,6 +77,8 @@ async def run(username: str, password: str, passphrase: str, server: str) -> int
             )
         except api.OmniFocusPassphraseError as err:
             print(f"FAIL login accepted, but the encryption passphrase is wrong: {err}")
+            info = await client.async_encryption_info()
+            print(f"     database key settings (not secret): {info}")
             return 2
         except api.OmniFocusAuthError as err:
             print(f"FAIL login rejected: {err}")

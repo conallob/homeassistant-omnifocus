@@ -148,8 +148,15 @@ class DocumentKey:
         self.slots = slots
 
     @staticmethod
-    def derive_wrapping_key(meta: EncryptionMetadata, passphrase: str) -> bytes:
-        """PBKDF2 the passphrase into the AES key-wrapping key."""
+    def derive_wrapping_key(
+        meta: EncryptionMetadata, passphrase: str, *, normalize: bool = True
+    ) -> bytes:
+        """PBKDF2 the passphrase into the AES key-wrapping key.
+
+        Omni's reference implementation (DecryptionExample.py) always derives
+        **16 bytes** (AES-128 wrap) whatever the PRF; a longer key for the SHA-2
+        PRFs would never unwrap a real database.
+        """
         import unicodedata
 
         if meta.method != "password":
@@ -159,21 +166,40 @@ class DocumentKey:
         prf = meta.prf or "sha1"
         if prf not in ("sha1", "sha256", "sha512"):
             raise OmniFocusCryptoError(f"Unsupported PRF: {prf}")
-        length = 16 if prf == "sha1" else 32
-        password = unicodedata.normalize("NFC", passphrase).encode("utf-8")
-        return hashlib.pbkdf2_hmac(prf, password, meta.salt, meta.rounds, length)
+        text = unicodedata.normalize("NFC", passphrase) if normalize else passphrase
+        return hashlib.pbkdf2_hmac(prf, text.encode("utf-8"), meta.salt, meta.rounds, 16)
 
     @classmethod
     def from_metadata(cls, meta: EncryptionMetadata, passphrase: str) -> DocumentKey:
-        """Unwrap the document keys; a wrong passphrase fails the RFC 3394 check."""
-        kek = cls.derive_wrapping_key(meta, passphrase)
-        try:
-            unwrapped = aes_key_unwrap(kek, meta.key)
-        except (InvalidUnwrap, InvalidKey, ValueError) as err:
-            raise OmniFocusPassphraseError(
-                "Could not unwrap the document key: the encryption passphrase is incorrect"
-            ) from err
-        return cls(parse_slots(unwrapped))
+        """Unwrap the document keys; a wrong passphrase fails the RFC 3394 check.
+
+        Omni's own code is ambiguous about Unicode normalisation (the spec says NFC
+        is ideal, the example does not, and macOS text input is often decomposed), so
+        a passphrase whose raw, NFC and NFD forms differ is tried each way. For plain
+        ASCII that is a single attempt. The unwrap integrity check makes a false match
+        negligible.
+        """
+        import unicodedata
+
+        candidates = list(
+            dict.fromkeys(
+                [
+                    passphrase,
+                    unicodedata.normalize("NFC", passphrase),
+                    unicodedata.normalize("NFD", passphrase),
+                ]
+            )
+        )
+        for candidate in candidates:
+            kek = cls.derive_wrapping_key(meta, candidate, normalize=False)
+            try:
+                unwrapped = aes_key_unwrap(kek, meta.key)
+            except InvalidUnwrap, InvalidKey, ValueError:
+                continue
+            return cls(parse_slots(unwrapped))
+        raise OmniFocusPassphraseError(
+            "Could not unwrap the document key: the encryption passphrase is incorrect"
+        )
 
     def wrap(self, kek: bytes) -> bytes:
         """Re-wrap the slots for storage in the ``encrypted`` metadata."""

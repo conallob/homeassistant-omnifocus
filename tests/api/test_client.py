@@ -328,3 +328,19 @@ async def test_rejection_message_says_what_the_server_offered(server, session) -
     _, srv = server
     with pytest.raises(OmniFocusAuthError, match=r"algorithm=MD5 qop=auth"):
         await make_client(srv, session, password="wrong").async_validate()
+
+
+@pytest.mark.parametrize("prf", ["sha1", "sha256", "sha512"])
+async def test_every_pbkdf2_prf_unlocks_end_to_end(session, prf) -> None:
+    """Regression: SHA-2 PRFs used to derive a 32-byte key and never unlocked."""
+    fake = FakeOmniServer(prf=prf)
+    seed(fake)
+    srv = TestServer(fake.app())
+    await srv.start_server()
+    try:
+        snap = await make_client(srv, session).async_refresh([INBOX], TZ)
+        assert snap.results[INBOX].items
+        with pytest.raises(OmniFocusPassphraseError):
+            await make_client(srv, session, passphrase="wrong").async_validate()
+    finally:
+        await srv.close()

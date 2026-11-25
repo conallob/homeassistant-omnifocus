@@ -47,4 +47,6 @@ async def test_wrong_password_and_whitespace_note(srv, monkeypatch, capsys) -> N
 
 async def test_wrong_passphrase(srv, monkeypatch, capsys) -> None:
     assert await _run(srv, monkeypatch, PASSWORD, "nope") == 2
-    assert "passphrase is wrong" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "passphrase is wrong" in out
+    assert "'prf': 'sha1'" in out and "'rounds': 10" in out
