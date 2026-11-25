@@ -79,18 +79,53 @@ def test_slots_round_trip() -> None:
     assert parse_slots(marshal_slots(slots)) == slots
 
 
-@pytest.mark.parametrize("prf", [None, "sha1", "sha256"])
-def test_passphrase_pipeline(prf: str | None) -> None:
+@pytest.mark.parametrize("prf", [None, "sha1", "sha256", "sha512"])
+def test_passphrase_pipeline_matches_omni_reference(prf: str | None) -> None:
+    """Wrap the way Omni's DecryptionExample.py unwraps: a 16-byte PBKDF2 key for every PRF.
+
+    The expected key is computed here with hashlib, not with the code under test, so
+    a wrong key length (e.g. 32 bytes for SHA-2) cannot hide behind a shared helper.
+    """
+    import hashlib
+
     from cryptography.hazmat.primitives.keywrap import aes_key_wrap
 
     slots = [Slot(SlotType.ACTIVE_AES_CTR_HMAC, 1, os.urandom(32))]
-    meta = EncryptionMetadata("password", "PBKDF2; aes128-wrap", 5, os.urandom(16), b"", prf)
-    kek = DocumentKey.derive_wrapping_key(meta, "pässword")
-    meta.key = aes_key_wrap(kek, marshal_slots(slots))
+    salt = os.urandom(16)
+    kek = hashlib.pbkdf2_hmac(prf or "sha1", "pässword".encode(), salt, 5, 16)
+    meta = EncryptionMetadata(
+        "password", "PBKDF2; aes128-wrap", 5, salt, aes_key_wrap(kek, marshal_slots(slots)), prf
+    )
     meta2 = parse_encryption_metadata(build_encryption_metadata(meta))
     assert DocumentKey.from_metadata(meta2, "pässword").slots == slots
     with pytest.raises(OmniFocusPassphraseError):
         DocumentKey.from_metadata(meta2, "wrong")
+
+
+def test_unicode_passphrase_unlocks_in_raw_or_nfc_form() -> None:
+    """Omni is ambiguous about NFC; a database wrapped with either form must unlock."""
+    import hashlib
+    import unicodedata
+
+    from cryptography.hazmat.primitives.keywrap import aes_key_wrap
+
+    nfd = unicodedata.normalize("NFD", "pässword")  # 'a' + combining diaeresis
+    nfc = unicodedata.normalize("NFC", "pässword")
+    assert nfd != nfc
+    slots = [Slot(SlotType.ACTIVE_AES_CTR_HMAC, 1, os.urandom(32))]
+    salt = os.urandom(16)
+    for wrapped_with in (nfd, nfc):
+        kek = hashlib.pbkdf2_hmac("sha256", wrapped_with.encode(), salt, 5, 16)
+        meta = EncryptionMetadata(
+            "password",
+            "PBKDF2; aes128-wrap",
+            5,
+            salt,
+            aes_key_wrap(kek, marshal_slots(slots)),
+            "sha256",
+        )
+        for typed in (nfd, nfc):
+            assert DocumentKey.from_metadata(meta, typed).slots == slots
 
 
 def test_ids_are_valid_names() -> None:

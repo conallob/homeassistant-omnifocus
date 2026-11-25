@@ -124,6 +124,19 @@ class OmniFocusStore:
         meta = parse_encryption_metadata(raw)
         self._doc_key = await run_in_executor(DocumentKey.from_metadata, meta, passphrase)
 
+    async def encryption_info(self) -> dict[str, object] | None:
+        """Non-secret key-derivation settings from the ``encrypted`` file, if any."""
+        raw = await self._dav.get_optional(self._child(ENCRYPTED_METADATA))
+        if raw is None:
+            return None
+        meta = parse_encryption_metadata(raw)
+        return {
+            "method": meta.method,
+            "algorithm": meta.algorithm,
+            "prf": meta.prf or "sha1 (default)",
+            "rounds": meta.rounds,
+        }
+
     async def list(self) -> StoreListing:
         """List transactions (chronological) and client files."""
         listing = StoreListing()

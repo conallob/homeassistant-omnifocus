@@ -90,7 +90,12 @@ class FakeOmniServer:
     """Holds the store files and serves them over WebDAV."""
 
     def __init__(
-        self, *, encrypted: bool = True, passphrase: str = PASSWORD, user: str = USER
+        self,
+        *,
+        encrypted: bool = True,
+        passphrase: str = PASSWORD,
+        user: str = USER,
+        prf: str = "sha1",
     ) -> None:
         self.files: dict[str, bytes] = {}
         self.doc_key: DocumentKey | None = None
@@ -98,18 +103,21 @@ class FakeOmniServer:
         self.shard_hits = 0
         self.fail_auth = False
         self.user = user
+        self.challenges = [f'Digest realm="{REALM}", nonce="{NONCE}", algorithm=MD5, qop="auth"']
         self.base = f"/{user}/OmniFocus.ofocus"
         if encrypted:
-            self._setup_encryption(passphrase)
+            self._setup_encryption(passphrase, prf)
         self._nonce_count = 0
 
     # ---- store content helpers -------------------------------------------------
 
-    def _setup_encryption(self, passphrase: str) -> None:
+    def _setup_encryption(self, passphrase: str, prf: str) -> None:
         salt, rounds = os.urandom(16), 10
         slots = [Slot(SlotType.ACTIVE_AES_CTR_HMAC, 1, os.urandom(32))]
-        meta = EncryptionMetadata("password", "PBKDF2; aes128-wrap", rounds, salt, b"", "sha1")
-        kek = DocumentKey.derive_wrapping_key(meta, passphrase)
+        meta = EncryptionMetadata("password", "PBKDF2; aes128-wrap", rounds, salt, b"", prf)
+        # Derived independently of the code under test, as Omni's DecryptionExample.py
+        # does: always a 16-byte (AES-128) wrapping key, whatever the PRF.
+        kek = hashlib.pbkdf2_hmac(prf, passphrase.encode("utf-8"), salt, rounds, 16)
         meta.key = aes_key_wrap(kek, marshal_slots(slots))
         self.doc_key = DocumentKey(slots)
         self.files["encrypted"] = build_encryption_metadata(meta)
@@ -163,14 +171,10 @@ class FakeOmniServer:
         if not request.path.startswith(f"/{self.user}/"):
             return web.Response(status=404, reason="No such user")
         if self.fail_auth or not self._digest_ok(request):
-            return web.Response(
-                status=401,
-                headers={
-                    "WWW-Authenticate": (
-                        f'Digest realm="{REALM}", nonce="{NONCE}", algorithm=MD5, qop="auth"'
-                    )
-                },
-            )
+            resp = web.Response(status=401)
+            for challenge in self.challenges:
+                resp.headers.add("WWW-Authenticate", challenge)
+            return resp
         path = request.path
         if request.method == "PROPFIND":
             return self._propfind(path, request.headers.get("Depth", "1"))
