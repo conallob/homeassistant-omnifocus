@@ -89,13 +89,16 @@ def task_xml(
 class FakeOmniServer:
     """Holds the store files and serves them over WebDAV."""
 
-    def __init__(self, *, encrypted: bool = True, passphrase: str = PASSWORD) -> None:
+    def __init__(
+        self, *, encrypted: bool = True, passphrase: str = PASSWORD, user: str = USER
+    ) -> None:
         self.files: dict[str, bytes] = {}
         self.doc_key: DocumentKey | None = None
         self.requests: list[tuple[str, str]] = []
         self.shard_hits = 0
         self.fail_auth = False
-        self.base = f"/{USER}/OmniFocus.ofocus"
+        self.user = user
+        self.base = f"/{user}/OmniFocus.ofocus"
         if encrypted:
             self._setup_encryption(passphrase)
         self._nonce_count = 0
@@ -142,11 +145,11 @@ class FakeOmniServer:
         if not header.startswith("Digest "):
             return False
         p = {m[0]: m[1] or m[2] for m in re.findall(r'(\w+)=(?:"([^"]*)"|([^,\s]+))', header[7:])}
-        if p.get("username") != USER or p.get("nonce") != NONCE:
+        if p.get("username") != self.user or p.get("nonce") != NONCE:
             return False
         if p.get("uri") != request.raw_path:
             return False
-        ha1 = _md5(f"{USER}:{REALM}:{PASSWORD}")
+        ha1 = _md5(f"{self.user}:{REALM}:{PASSWORD}")
         ha2 = _md5(f"{request.method}:{p['uri']}")
         expect = _md5(f"{ha1}:{NONCE}:{p['nc']}:{p['cnonce']}:{p['qop']}:{ha2}")
         return p.get("response") == expect
@@ -157,6 +160,8 @@ class FakeOmniServer:
         if request.path.startswith("/entry/"):
             self.shard_hits += 1
             raise web.HTTPFound(request.path.replace("/entry/", "/", 1))
+        if not request.path.startswith(f"/{self.user}/"):
+            return web.Response(status=404, reason="No such user")
         if self.fail_auth or not self._digest_ok(request):
             return web.Response(
                 status=401,

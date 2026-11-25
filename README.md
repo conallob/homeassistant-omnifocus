@@ -50,6 +50,28 @@ Each list has a **mode**: *Read only* (default) or *Read / write*. Completed tas
 for 7 days so you can un-tick them. Due dates are OmniFocus floating (wall-clock) times in
 Home Assistant's time zone; a date-only due date from HA is stored as 17:00.
 
+## Troubleshooting
+
+**"The Omni Sync Server rejected the login"** means the HTTP login failed, before the
+encryption passphrase is even used. Two different secrets are involved:
+
+| Where | What to enter |
+| --- | --- |
+| Application credential **Client ID** | your Omni Sync Server **account name** |
+| Application credential **Client secret** | your sync account **password** (used to log in) |
+| Integration form *Encryption passphrase* | only if it differs from the password; unlocks your data |
+
+Check the account and password outside Home Assistant (replace `USER` and `PASS`; `207` means
+the login works, `401` a wrong password, `404` an unknown account name):
+
+```bash
+curl -s --digest -u 'USER:PASS' --location-trusted -X PROPFIND -H 'Depth: 0' \
+  https://sync.omnigroup.com/USER/OmniFocus.ofocus/ -o /dev/null -w '%{http_code}\n'
+```
+
+The Home Assistant log names the account that was tried (never the password). For more detail
+enable `custom_components.omnifocus: debug` under `logger:`.
+
 ## Known limitations
 
 - **Perspectives are best-effort.** OmniFocus does not document its perspective rule
