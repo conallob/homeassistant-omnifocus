@@ -1,5 +1,16 @@
 # OmniFocus for Home Assistant
 
+[![CI](https://github.com/conallob/homeassistant-omnifocus/actions/workflows/ci.yml/badge.svg)](https://github.com/conallob/homeassistant-omnifocus/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/conallob/homeassistant-omnifocus/graph/badge.svg)](https://codecov.io/gh/conallob/homeassistant-omnifocus)
+[![Latest release](https://img.shields.io/github/v/release/conallob/homeassistant-omnifocus?include_prereleases)](https://github.com/conallob/homeassistant-omnifocus/releases)
+[![License: BSD 3-Clause](https://img.shields.io/github/license/conallob/homeassistant-omnifocus)](LICENSE)
+[![HACS: Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.3%2B-41BDF5.svg?logo=homeassistant&logoColor=white)](https://www.home-assistant.io)
+[![Python 3.14+](https://img.shields.io/badge/python-3.14%2B-blue.svg?logo=python&logoColor=white)](https://www.python.org)
+[![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Open issues](https://img.shields.io/github/issues/conallob/homeassistant-omnifocus)](https://github.com/conallob/homeassistant-omnifocus/issues)
+[![Last commit](https://img.shields.io/github/last-commit/conallob/homeassistant-omnifocus)](https://github.com/conallob/homeassistant-omnifocus/commits/main)
+
 Sync Home Assistant **to-do lists** with [OmniFocus](https://www.omnigroup.com/omnifocus) by
 talking directly to the **Omni Sync Server** over WebDAV: no Mac, no running OmniFocus app.
 
@@ -126,7 +137,7 @@ The *Release* workflow runs the tests, stamps the tag's version into `manifest.j
 OmniFocus and the OmniFocus icon are trademarks of the Omni Group. The icon in
 `custom_components/omnifocus/brand/` is the Omni Group's, used under their
 [press guidelines](https://www.omnigroup.com/press/) to refer to their software; it is **not**
-covered by this project's MIT license, and this project is not affiliated with or endorsed by
+covered by this project's license, and this project is not affiliated with or endorsed by
 the Omni Group.
 
-The code is MIT licensed.
+The code is licensed under the [BSD 3-Clause License](LICENSE).
