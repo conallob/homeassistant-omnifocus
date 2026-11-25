@@ -125,7 +125,16 @@ class OmniFocusConfigFlow(ConfigFlow, domain=DOMAIN):
         )
         try:
             await client.async_validate()
-        except OmniFocusAuthError:
+        except OmniFocusAuthError as err:
+            _LOGGER.warning(
+                "Omni Sync Server rejected the login for account %r on %s: %s. "
+                "Check Settings > Application credentials: the client ID must be the sync "
+                "account name and the client secret its account password (not the "
+                "encryption passphrase)",
+                creds.username,
+                urlsplit(server_url).netloc or server_url,
+                err,
+            )
             return "invalid_auth"
         except OmniFocusPassphraseError:
             return "invalid_passphrase"
@@ -180,7 +189,14 @@ class OmniFocusConfigFlow(ConfigFlow, domain=DOMAIN):
         )
         schema[vol.Optional(CONF_SERVER_URL, default=DEFAULT_SERVER)] = str
         schema[vol.Optional(CONF_DATABASE, default=DEFAULT_DATABASE)] = str
-        return self.async_show_form(step_id="user", data_schema=vol.Schema(schema), errors=errors)
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema(schema),
+            errors=errors,
+            description_placeholders={
+                "accounts": ", ".join(sorted(c.username for c in credentials.values()))
+            },
+        )
 
     async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> ConfigFlowResult:
         """Credentials or passphrase stopped working."""
@@ -223,7 +239,12 @@ class OmniFocusConfigFlow(ConfigFlow, domain=DOMAIN):
             TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
         )
         return self.async_show_form(
-            step_id="reauth_confirm", data_schema=vol.Schema(schema), errors=errors
+            step_id="reauth_confirm",
+            data_schema=vol.Schema(schema),
+            errors=errors,
+            description_placeholders={
+                "accounts": ", ".join(sorted(c.username for c in credentials.values()))
+            },
         )
 
 

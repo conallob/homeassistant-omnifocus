@@ -101,6 +101,20 @@ async def test_bad_password_shows_error(hass: HomeAssistant, fake) -> None:
     assert result["errors"] == {"base": "invalid_auth"}
 
 
+async def test_bad_password_logs_account_but_not_secret(
+    hass: HomeAssistant, fake, caplog: pytest.LogCaptureFixture
+) -> None:
+    _, srv = fake
+    await _add_credential(hass, password="hunter2-wrong")
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    assert USER in result["description_placeholders"]["accounts"]
+    await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"server_url": str(srv.make_url("/entry"))}
+    )
+    assert f"account '{USER}'" in caplog.text
+    assert "hunter2-wrong" not in caplog.text
+
+
 async def test_bad_passphrase_shows_error(hass: HomeAssistant, fake) -> None:
     _, srv = fake
     await _add_credential(hass)

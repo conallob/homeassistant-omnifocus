@@ -281,3 +281,25 @@ async def test_same_second_transactions_replay_in_chain_order(server, session) -
     fresh = make_client(srv, session)
     snap = await fresh.async_refresh([INBOX], TZ)
     assert "Quick (renamed)" in [i.name for i in snap.results[INBOX].items]
+
+
+@pytest.mark.parametrize("username", ["me@example.com", "a+b", "Jo Smith", "ünï"])
+async def test_usernames_needing_percent_encoding(session, username) -> None:
+    """The Digest uri must equal the request line even when the name is escaped."""
+    fake = FakeOmniServer(user=username)
+    seed(fake)
+    srv = TestServer(fake.app())
+    await srv.start_server()
+    try:
+        client = make_client(srv, session, username=username)
+        snap = await client.async_refresh([INBOX], TZ)
+        assert snap.results[INBOX].items
+    finally:
+        await srv.close()
+
+
+async def test_unknown_account_is_an_auth_error(server, session) -> None:
+    """Omni answers '404 No such user' for a misspelt account name."""
+    _, srv = server
+    with pytest.raises(OmniFocusAuthError):
+        await make_client(srv, session, username="ghost").async_validate()

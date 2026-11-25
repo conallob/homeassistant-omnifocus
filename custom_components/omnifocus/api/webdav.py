@@ -8,6 +8,7 @@ handful of verbs OmniFocus sync needs.
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 import secrets
 from dataclasses import dataclass
@@ -18,6 +19,8 @@ import aiohttp
 from yarl import URL
 
 from .errors import OmniFocusAuthError, OmniFocusConnectionError
+
+_LOGGER = logging.getLogger(__name__)
 
 _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 _PROPFIND_BODY = (
@@ -145,7 +148,9 @@ class WebDavClient:
         data: bytes | str | None = None,
     ) -> tuple[int, bytes, str]:
         """Perform a request. Returns ``(status, body, final_url)``."""
-        url = URL(raw_url)
+        # encoded=True keeps percent-escapes (e.g. %40) exactly as built; yarl would
+        # otherwise rewrite them, and the Digest ``uri`` must match the request line.
+        url = URL(raw_url, encoded=True)
         redirects = 0
         auth_attempts = 0
         while True:
@@ -159,10 +164,15 @@ class WebDavClient:
                 ) as resp:
                     body = await resp.read()
                     status = resp.status
+                    reason = resp.reason or ""
                     location = resp.headers.get("Location")
                     www_auth = resp.headers.get("WWW-Authenticate")
             except (aiohttp.ClientError, TimeoutError) as err:
                 raise OmniFocusConnectionError(f"{method} {url.host}: {err}") from err
+
+            if status == 404 and "no such user" in reason.lower():
+                # Omni Sync Server answers this (before auth) for unknown account names.
+                raise OmniFocusAuthError(f"No Omni Sync Server account named in {url.path!r}")
 
             if status in _REDIRECT_STATUSES:
                 if not location:
@@ -170,7 +180,7 @@ class WebDavClient:
                 redirects += 1
                 if redirects > self._max_redirects:
                     raise OmniFocusConnectionError("Too many redirects")
-                url = URL(urljoin(str(url), location))
+                url = URL(urljoin(str(url), location), encoded=True)
                 auth_attempts = 0
                 continue
 
@@ -183,7 +193,17 @@ class WebDavClient:
                     self._nc[origin] = 0
                     auth_attempts += 1
                     continue
-                raise OmniFocusAuthError(f"Authentication failed (401) for {method} {url.path}")
+                _LOGGER.debug(
+                    "401 from %s for %s (digest challenge: %s, attempts: %d, stale: %s)",
+                    url.host,
+                    method,
+                    "yes" if challenge else "no/unsupported",
+                    auth_attempts,
+                    stale,
+                )
+                raise OmniFocusAuthError(
+                    f"Sync server {url.host} rejected the credentials (HTTP 401)"
+                )
 
             return status, body, str(url)
 

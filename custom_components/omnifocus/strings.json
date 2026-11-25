@@ -6,7 +6,7 @@
     "step": {
       "user": {
         "title": "Connect to OmniFocus",
-        "description": "Pick the stored Omni Sync Server credentials. Leave the passphrase empty if your database is encrypted with your sync password (the OmniFocus default).",
+        "description": "Signing in with the stored credential for: **{accounts}**.\\n\\nTwo different secrets are involved: the credential's *client secret* is your Omni Sync Server **account password** (used to log in), while the *encryption passphrase* below only unlocks your data. Leave the passphrase empty if it is the same as your password.",
         "data": {
           "implementation": "Credentials",
           "passphrase": "Encryption passphrase (optional)",
@@ -16,7 +16,7 @@
       },
       "reauth_confirm": {
         "title": "Re-authenticate with OmniFocus",
-        "description": "The sync server or database rejected the stored credentials or passphrase. Update the credential in *Application credentials* if the password changed, then confirm here.",
+        "description": "Re-checking the credential for: **{accounts}**. If your sync password changed, update it under *Application credentials* first. Enter the encryption passphrase only if it differs from your account password.",
         "data": {
           "implementation": "Credentials",
           "passphrase": "Encryption passphrase (optional)"
@@ -25,8 +25,8 @@
     },
     "error": {
       "cannot_connect": "Cannot reach the Omni Sync Server.",
-      "invalid_auth": "The sync username or password was rejected.",
-      "invalid_passphrase": "The encryption passphrase is incorrect.",
+      "invalid_auth": "The Omni Sync Server rejected the login. Check the stored credential: the client ID must be your sync account name and the client secret your account **password** (not the encryption passphrase). Details are in the Home Assistant log.",
+      "invalid_passphrase": "Logged in, but the encryption passphrase could not unlock your data.",
       "unknown": "Unexpected error; see the Home Assistant log."
     },
     "abort": {
@@ -54,12 +54,16 @@
         },
         "project": {
           "title": "Choose project",
-          "data": { "project": "Project" }
+          "data": {
+            "project": "Project"
+          }
         },
         "perspective": {
           "title": "Choose perspective",
           "description": "Perspective support is best-effort: custom perspective rules are evaluated by Home Assistant, and items cannot be added to a perspective.",
-          "data": { "perspective": "Perspective" }
+          "data": {
+            "perspective": "Perspective"
+          }
         }
       },
       "error": {
@@ -76,8 +80,12 @@
   "options": {
     "step": {
       "init": {
-        "data": { "scan_interval": "Polling interval" },
-        "data_description": { "scan_interval": "How often to check the sync server for changes, in seconds." }
+        "data": {
+          "scan_interval": "Polling interval"
+        },
+        "data_description": {
+          "scan_interval": "How often to check the sync server for changes, in seconds."
+        }
       }
     }
   },
@@ -97,8 +105,14 @@
     }
   },
   "exceptions": {
-    "read_only": { "message": "This to-do list is read-only. Change its mode to read / write to edit it." },
-    "not_found": { "message": "That item no longer exists in OmniFocus." },
-    "write_failed": { "message": "OmniFocus rejected the change: {error}" }
+    "read_only": {
+      "message": "This to-do list is read-only. Change its mode to read / write to edit it."
+    },
+    "not_found": {
+      "message": "That item no longer exists in OmniFocus."
+    },
+    "write_failed": {
+      "message": "OmniFocus rejected the change: {error}"
+    }
   }
 }
