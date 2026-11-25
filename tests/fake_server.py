@@ -98,6 +98,7 @@ class FakeOmniServer:
         self.shard_hits = 0
         self.fail_auth = False
         self.user = user
+        self.challenges = [f'Digest realm="{REALM}", nonce="{NONCE}", algorithm=MD5, qop="auth"']
         self.base = f"/{user}/OmniFocus.ofocus"
         if encrypted:
             self._setup_encryption(passphrase)
@@ -163,14 +164,10 @@ class FakeOmniServer:
         if not request.path.startswith(f"/{self.user}/"):
             return web.Response(status=404, reason="No such user")
         if self.fail_auth or not self._digest_ok(request):
-            return web.Response(
-                status=401,
-                headers={
-                    "WWW-Authenticate": (
-                        f'Digest realm="{REALM}", nonce="{NONCE}", algorithm=MD5, qop="auth"'
-                    )
-                },
-            )
+            resp = web.Response(status=401)
+            for challenge in self.challenges:
+                resp.headers.add("WWW-Authenticate", challenge)
+            return resp
         path = request.path
         if request.method == "PROPFIND":
             return self._propfind(path, request.headers.get("Depth", "1"))

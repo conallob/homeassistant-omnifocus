@@ -72,6 +72,26 @@ def parse_digest_challenge(header: str) -> Challenge | None:
     )
 
 
+def parse_digest_challenges(headers: list[str]) -> list[Challenge]:
+    """Parse every Digest challenge across all ``WWW-Authenticate`` header lines.
+
+    A server may send several header lines, or several challenges in one line,
+    e.g. one per hash algorithm.
+    """
+    joined = ", ".join(headers)
+    parts = re.split(r",?\s*(?=\bDigest\s)", joined, flags=re.IGNORECASE)
+    found = (parse_digest_challenge(part) for part in parts if part.strip())
+    return [c for c in found if c is not None]
+
+
+def select_challenge(challenges: list[Challenge]) -> Challenge | None:
+    """The first challenge we can answer (MD5 is the only algorithm implemented)."""
+    return next(
+        (c for c in challenges if (c.algorithm or "MD5").upper() == "MD5"),
+        None,
+    )
+
+
 def _md5(value: str) -> str:
     return hashlib.md5(value.encode("utf-8"), usedforsecurity=False).hexdigest()
 
@@ -166,7 +186,7 @@ class WebDavClient:
                     status = resp.status
                     reason = resp.reason or ""
                     location = resp.headers.get("Location")
-                    www_auth = resp.headers.get("WWW-Authenticate")
+                    www_auth = resp.headers.getall("WWW-Authenticate", [])
             except (aiohttp.ClientError, TimeoutError) as err:
                 raise OmniFocusConnectionError(f"{method} {url.host}: {err}") from err
 
@@ -185,24 +205,31 @@ class WebDavClient:
                 continue
 
             if status == 401:
-                challenge = parse_digest_challenge(www_auth) if www_auth else None
-                stale = bool(www_auth and "stale=true" in www_auth.lower())
+                offered = parse_digest_challenges(www_auth)
+                challenge = select_challenge(offered)
+                stale = any("stale=true" in h.lower() for h in www_auth)
+                if offered and challenge is None:
+                    algos = ", ".join(sorted({c.algorithm or "MD5" for c in offered}))
+                    raise OmniFocusAuthError(
+                        f"Sync server {url.host} only offers Digest algorithm(s) {algos}; "
+                        "this integration supports MD5 only"
+                    )
                 if challenge and (auth_attempts == 0 or (stale and auth_attempts < 2)):
                     origin = url.origin().human_repr()
                     self._challenges[origin] = challenge
                     self._nc[origin] = 0
                     auth_attempts += 1
                     continue
-                _LOGGER.debug(
-                    "401 from %s for %s (digest challenge: %s, attempts: %d, stale: %s)",
-                    url.host,
-                    method,
-                    "yes" if challenge else "no/unsupported",
-                    auth_attempts,
-                    stale,
+                seen = (
+                    f"Digest realm={challenge.realm!r} algorithm={challenge.algorithm or 'MD5'} "
+                    f"qop={challenge.qop}"
+                    if challenge
+                    else f"no usable Digest challenge in {www_auth!r}"
                 )
                 raise OmniFocusAuthError(
-                    f"Sync server {url.host} rejected the credentials (HTTP 401)"
+                    f"Sync server {url.host} rejected the credentials (HTTP 401; "
+                    f"after sending a Digest login: {'yes' if auth_attempts else 'no'}; "
+                    f"server offered: {seen})"
                 )
 
             return status, body, str(url)

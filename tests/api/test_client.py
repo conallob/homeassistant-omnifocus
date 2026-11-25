@@ -303,3 +303,28 @@ async def test_unknown_account_is_an_auth_error(server, session) -> None:
     _, srv = server
     with pytest.raises(OmniFocusAuthError):
         await make_client(srv, session, username="ghost").async_validate()
+
+
+SHA256 = 'Digest realm="Omni Sync", nonce="abc123nonce", algorithm=SHA-256, qop="auth"'
+MD5 = 'Digest realm="Omni Sync", nonce="abc123nonce", algorithm=MD5, qop="auth"'
+
+
+async def test_picks_the_md5_challenge_when_several_are_offered(server, session) -> None:
+    """A server may list SHA-256 first and MD5 second, as separate header lines."""
+    fake, srv = server
+    fake.challenges = [SHA256, MD5]
+    snap = await make_client(srv, session).async_refresh([INBOX], TZ)
+    assert snap.results[INBOX].items
+
+
+async def test_unsupported_only_algorithm_is_reported_precisely(server, session) -> None:
+    fake, srv = server
+    fake.challenges = [SHA256]
+    with pytest.raises(OmniFocusAuthError, match="SHA-256"):
+        await make_client(srv, session).async_validate()
+
+
+async def test_rejection_message_says_what_the_server_offered(server, session) -> None:
+    _, srv = server
+    with pytest.raises(OmniFocusAuthError, match=r"algorithm=MD5 qop=auth"):
+        await make_client(srv, session, password="wrong").async_validate()
