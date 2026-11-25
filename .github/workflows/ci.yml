@@ -16,7 +16,13 @@ jobs:
       - run: pip install -r requirements_test.txt
       - run: ruff check .
       - run: ruff format --check .
-      - run: pytest
+      - run: pytest --cov=custom_components/omnifocus --cov-report=xml --cov-report=term
+      - uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          # Don't fail CI if Codecov is unavailable or the token isn't set yet.
+          fail_ci_if_error: false
 
   hassfest:
     runs-on: ubuntu-latest
