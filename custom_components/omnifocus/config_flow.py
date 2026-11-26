@@ -82,6 +82,17 @@ def _select(options: list[str] | list[SelectOptionDict], key: str | None = None)
     return SelectSelector(config)
 
 
+def describe_secret(value: str) -> str:
+    """Non-revealing facts about a stored credential, for comparing with the real one.
+
+    Never includes any character of the value. (Home Assistant strips surrounding
+    whitespace when it stores application credentials, so only the length and
+    non-ASCII characters can differ from what the user believes they entered.)
+    """
+    suffix = ", with non-ASCII characters" if not value.isascii() else ""
+    return f"{len(value)} characters{suffix}"
+
+
 class OmniFocusConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for OmniFocus."""
 
@@ -130,10 +141,13 @@ class OmniFocusConfigFlow(ConfigFlow, domain=DOMAIN):
                 "Omni Sync Server rejected the login for account %r on %s: %s. "
                 "Check Settings > Application credentials: the client ID must be the sync "
                 "account name and the client secret its account password (not the "
-                "encryption passphrase)",
+                "encryption passphrase). The stored client secret is %s; the stored client ID "
+                "is %s. Compare these with your real password/account name",
                 creds.username,
                 urlsplit(server_url).netloc or server_url,
                 err,
+                describe_secret(creds.password),
+                describe_secret(creds.username),
             )
             return "invalid_auth"
         except OmniFocusPassphraseError:

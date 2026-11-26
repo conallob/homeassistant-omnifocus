@@ -113,6 +113,20 @@ async def test_bad_password_logs_account_but_not_secret(
     )
     assert f"account '{USER}'" in caplog.text
     assert "hunter2-wrong" not in caplog.text
+    # Describes the stored secret by length/shape only, so it can be compared.
+    assert f"client secret is {len('hunter2-wrong')} characters;" in caplog.text
+
+
+async def test_secret_shape_flags_non_ascii(hass: HomeAssistant, fake, caplog) -> None:
+    """A non-ASCII secret is called out by shape only, never echoed."""
+    _, srv = fake
+    await _add_credential(hass, password="pässwörd-wrong")
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"server_url": str(srv.make_url("/entry"))}
+    )
+    assert "14 characters, with non-ASCII characters" in caplog.text
+    assert "pässwörd" not in caplog.text
 
 
 async def test_bad_passphrase_shows_error(
