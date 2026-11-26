@@ -144,6 +144,28 @@ async def test_bad_passphrase_shows_error(
     assert "nope" not in caplog.text
 
 
+async def test_bad_passphrase_still_reported_if_key_settings_unavailable(
+    hass: HomeAssistant, fake, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Fetching the diagnostic key settings must never mask the real error."""
+    from unittest.mock import patch
+
+    from custom_components.omnifocus.api import OmniFocusConnectionError
+
+    _, srv = fake
+    await _add_credential(hass)
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    with patch(
+        "custom_components.omnifocus.config_flow.OmniFocusClient.async_encryption_info",
+        side_effect=OmniFocusConnectionError("boom"),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"server_url": str(srv.make_url("/entry")), "passphrase": "nope"}
+        )
+    assert result["errors"] == {"base": "invalid_passphrase"}
+    assert "key settings, not secret: None" in caplog.text
+
+
 async def test_password_not_stored_in_entry(hass: HomeAssistant, fake) -> None:
     _, srv = fake
     entry = await _create_entry(hass, srv)
