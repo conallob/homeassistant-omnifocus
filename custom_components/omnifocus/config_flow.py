@@ -137,6 +137,18 @@ class OmniFocusConfigFlow(ConfigFlow, domain=DOMAIN):
             )
             return "invalid_auth"
         except OmniFocusPassphraseError:
+            try:
+                info = await client.async_encryption_info()
+            except OmniFocusError:
+                info = None
+            _LOGGER.warning(
+                "Logged in to Omni Sync Server as %r, but the encryption passphrase did not "
+                "unlock the database (key settings, not secret: %s). The encryption passphrase is "
+                "set when OmniFocus sync encryption was enabled and can differ from the sync "
+                "account password, including from an older password",
+                creds.username,
+                info,
+            )
             return "invalid_passphrase"
         except OmniFocusConnectionError:
             return "cannot_connect"

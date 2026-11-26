@@ -115,7 +115,9 @@ async def test_bad_password_logs_account_but_not_secret(
     assert "hunter2-wrong" not in caplog.text
 
 
-async def test_bad_passphrase_shows_error(hass: HomeAssistant, fake) -> None:
+async def test_bad_passphrase_shows_error(
+    hass: HomeAssistant, fake, caplog: pytest.LogCaptureFixture
+) -> None:
     _, srv = fake
     await _add_credential(hass)
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
@@ -123,6 +125,9 @@ async def test_bad_passphrase_shows_error(hass: HomeAssistant, fake) -> None:
         result["flow_id"], {"server_url": str(srv.make_url("/entry")), "passphrase": "nope"}
     )
     assert result["errors"] == {"base": "invalid_passphrase"}
+    # The log carries the database's non-secret key settings (never the passphrase).
+    assert "'prf': 'sha1'" in caplog.text
+    assert "nope" not in caplog.text
 
 
 async def test_password_not_stored_in_entry(hass: HomeAssistant, fake) -> None:
