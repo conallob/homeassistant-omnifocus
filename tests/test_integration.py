@@ -113,9 +113,25 @@ async def test_bad_password_logs_account_but_not_secret(
     )
     assert f"account '{USER}'" in caplog.text
     assert "hunter2-wrong" not in caplog.text
+    # Describes the stored secret by length/shape only, so it can be compared.
+    assert f"client secret is {len('hunter2-wrong')} characters;" in caplog.text
 
 
-async def test_bad_passphrase_shows_error(hass: HomeAssistant, fake) -> None:
+async def test_secret_shape_flags_non_ascii(hass: HomeAssistant, fake, caplog) -> None:
+    """A non-ASCII secret is called out by shape only, never echoed."""
+    _, srv = fake
+    await _add_credential(hass, password="pässwörd-wrong")
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"server_url": str(srv.make_url("/entry"))}
+    )
+    assert "14 characters, with non-ASCII characters" in caplog.text
+    assert "pässwörd" not in caplog.text
+
+
+async def test_bad_passphrase_shows_error(
+    hass: HomeAssistant, fake, caplog: pytest.LogCaptureFixture
+) -> None:
     _, srv = fake
     await _add_credential(hass)
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
@@ -123,6 +139,31 @@ async def test_bad_passphrase_shows_error(hass: HomeAssistant, fake) -> None:
         result["flow_id"], {"server_url": str(srv.make_url("/entry")), "passphrase": "nope"}
     )
     assert result["errors"] == {"base": "invalid_passphrase"}
+    # The log carries the database's non-secret key settings (never the passphrase).
+    assert "'prf': 'sha1'" in caplog.text
+    assert "nope" not in caplog.text
+
+
+async def test_bad_passphrase_still_reported_if_key_settings_unavailable(
+    hass: HomeAssistant, fake, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Fetching the diagnostic key settings must never mask the real error."""
+    from unittest.mock import patch
+
+    from custom_components.omnifocus.api import OmniFocusConnectionError
+
+    _, srv = fake
+    await _add_credential(hass)
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    with patch(
+        "custom_components.omnifocus.config_flow.OmniFocusClient.async_encryption_info",
+        side_effect=OmniFocusConnectionError("boom"),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"server_url": str(srv.make_url("/entry")), "passphrase": "nope"}
+        )
+    assert result["errors"] == {"base": "invalid_passphrase"}
+    assert "key settings, not secret: None" in caplog.text
 
 
 async def test_password_not_stored_in_entry(hass: HomeAssistant, fake) -> None:

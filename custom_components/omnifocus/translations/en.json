@@ -26,7 +26,7 @@
     "error": {
       "cannot_connect": "Cannot reach the Omni Sync Server.",
       "invalid_auth": "The Omni Sync Server rejected the login. Check the stored credential: the client ID must be your sync account name and the client secret your account **password** (not the encryption passphrase). Details are in the Home Assistant log.",
-      "invalid_passphrase": "Logged in, but the encryption passphrase could not unlock your data.",
+      "invalid_passphrase": "Logged in, but this encryption passphrase did not unlock your database. It is the passphrase chosen when OmniFocus sync encryption was set up, which can differ from your sync password (for example an older password). Details are in the Home Assistant log.",
       "unknown": "Unexpected error; see the Home Assistant log."
     },
     "abort": {
